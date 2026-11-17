@@ -264,17 +264,63 @@ public:
         // slots across two banks. Past 4 banks (1,024 slots), drop the count as a reset would.
         static constexpr size_t MaxRunningQuerySlots = 4 * SamplesQueryBank::BANK_SIZE;
         if (current_query && current_query->size_slots > MaxRunningQuerySlots) {
-            // It drops a real count. Logged on the 1st, 2nd, 4th, 8th... drop, so a window this
-            // long during gameplay doesn't go unnoticed and a title screen doesn't flood the log.
+            // Dropping the count is what a reset would do, but the guest never reset it: a title
+            // that reads the counter as a running total and uses the change since its last
+            // report (Mario Kart World, many thousands of drops a session) then sees the total go
+            // down, and the unsigned difference wraps to a huge count for one frame (a one-frame
+            // white haze over the whole picture). EDEN_NX2_QUERY_FOLD=1 folds the count into the
+            // amend value instead, so the total keeps running and the banks still get released.
+            static const bool fold = [] {
+                const char* const value = std::getenv("EDEN_NX2_QUERY_FOLD");
+                return value != nullptr && value[0] == '1';
+            }();
             ++bank_bound_resets;
             if ((bank_bound_resets & (bank_bound_resets - 1)) == 0) {
                 LOG_WARNING(Render_Vulkan,
-                            "Samples query ran {} slots with no reset or report, dropped its "
-                            "count (drop {})",
-                            current_query->size_slots, bank_bound_resets);
+                            "Samples query ran {} slots with no reset or report, {} its count "
+                            "({} {})",
+                            current_query->size_slots, fold ? "folded" : "dropped",
+                            fold ? "fold" : "drop", bank_bound_resets);
             }
-            ResetCounter();
+            if (fold) {
+                FoldCurrentQuery();
+            } else {
+                ResetCounter();
+            }
         }
+    }
+
+    // Ends the running query without losing its count: its slots resolve like a report's, their
+    // total becomes the amend value later queries add, and a new query starts on fresh slots.
+    // The same carry PresyncWrites makes at every sync (ReplicateCurrentQueryIfNeeded, then
+    // amend_value = accumulation_value), without a report. Sync operations run in order, so a
+    // report made before the fold adds the old amend and one made after it adds the new.
+    void FoldCurrentQuery() {
+        if (!current_query) {
+            return;
+        }
+        const size_t index = BuildQuery();
+        auto* const new_query = GetQuery(index);
+        new_query->guest_address = 0;
+        new_query->value = 0;
+        new_query->flags &= ~VideoCommon::QueryFlagBits::IsOrphan;
+        new_query->start_bank_id = current_query->start_bank_id;
+        new_query->size_banks = current_query->size_banks;
+        new_query->start_slot = current_query->start_slot;
+        new_query->size_slots = current_query->size_slots;
+        ApplyBankOp(new_query, [](SamplesQueryBank* bank, size_t start, size_t amount) {
+            bank->AddReference(amount);
+        });
+        pending_flush_queries.push_back(index);
+        std::function<void()> func([this, index] {
+            auto* const query = GetQuery(index);
+            query->value += GetAmendValue();
+            SetAccumulationValue(query->value);
+            amend_value = accumulation_value;
+            Free(index);
+        });
+        rasterizer->SyncOperation(std::move(func));
+        AbandonCurrentQuery();
     }
 
     bool HasPendingSync() const override {
