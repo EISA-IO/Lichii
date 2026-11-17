@@ -6,6 +6,7 @@
 #include <version>
 #if __cpp_lib_chrono >= 201907L
 #include <chrono>
+#include <cstdlib>
 #include <exception>
 #include <stdexcept>
 #endif
@@ -203,6 +204,21 @@ void UpdateGPUAccuracy() {
 
 bool IsGPULevelHigh() {
     return values.current_gpu_accuracy == GpuAccuracy::High;
+}
+
+bool IsGPULevelHighFor(GpuHighPart part) {
+    static const std::array<bool, 5> forced = [] {
+        const auto on = [](const char* name) {
+            const char* value = std::getenv(name);
+            return value != nullptr && value[0] != '\0' && value[0] != '0';
+        };
+        return std::array<bool, 5>{
+            on("EDEN_NX2_HIGH_REPORTS"),  on("EDEN_NX2_HIGH_TEXFLUSH"),
+            on("EDEN_NX2_HIGH_FLUSHINV"), on("EDEN_NX2_HIGH_PRECISE"),
+            on("EDEN_NX2_HIGH_SAFELISTS"),
+        };
+    }();
+    return IsGPULevelHigh() || forced[static_cast<size_t>(part)];
 }
 
 bool IsDMALevelDefault() {

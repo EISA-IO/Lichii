@@ -113,7 +113,7 @@ bool ReleasesLandAtOnce() {
         Settings::IsGPUFenceBehaviorDefault()
             ? Settings::IsGPULevelHigh()
             : Settings::IsGPUFenceBehaviorBalanced() || Settings::IsGPUFenceBehaviorAccurate();
-    return !delay_fence && !Settings::IsGPULevelHigh();
+    return !delay_fence && !Settings::IsGPULevelHighFor(Settings::GpuHighPart::Reports);
 }
 
 enum class AcquireCheck {

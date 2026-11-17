@@ -342,7 +342,9 @@ bool GpuSplit::WaitForSync() {
 }
 
 GpuSplit::Landing GpuSplit::ReportLanding(bool fence_flagged) {
-    return fence_flagged || Settings::IsGPULevelHigh() ? Landing::Fenced : Landing::AtRun;
+    return fence_flagged || Settings::IsGPULevelHighFor(Settings::GpuHighPart::Reports)
+               ? Landing::Fenced
+               : Landing::AtRun;
 }
 
 GpuSplit::Landing GpuSplit::FenceLanding() {

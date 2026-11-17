@@ -571,7 +571,9 @@ bool DmaPusher::Step() {
         // A safe read flushes the caches, which belong to the split's back thread while it runs:
         // there the GPU-written list tracking below and FlushCachedCommands take its place.
         const bool safe_reads =
-            Settings::IsDMALevelDefault() ? Settings::IsGPULevelHigh() : Settings::IsDMALevelSafe();
+            Settings::IsDMALevelDefault()
+                ? Settings::IsGPULevelHighFor(Settings::GpuHighPart::SafeLists)
+                : Settings::IsDMALevelSafe();
         const bool use_safe = !VideoCommon::GpuSplit::Get().Active() && safe_reads;
         // Pages no GPU work has written yet may still get the list from compute or copy work
         // queued before it. The GPU fetches the list after that work only past a host-level wait

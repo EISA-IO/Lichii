@@ -1174,6 +1174,19 @@ bool GetDebugKnobAt(u8 i);
 void UpdateGPUAccuracy();
 bool IsGPULevelHigh();
 
+/// One guarantee that High GPU accuracy adds. Each can be turned on alone at a lower accuracy with
+/// its EDEN_NX2_HIGH_* switch, so a title that needs one of them (Mario Kart World's one-frame
+/// haze veil) doesn't pay for all of them.
+enum class GpuHighPart : u8 {
+    Reports,         ///< EDEN_NX2_HIGH_REPORTS: payload reports land at the fence, not at once
+    TextureFlush,    ///< EDEN_NX2_HIGH_TEXFLUSH: CPU reads flush GPU-written textures
+    FlushInvalidate, ///< EDEN_NX2_HIGH_FLUSHINV: flush-and-invalidate writes GPU data back first
+    PreciseQueries,  ///< EDEN_NX2_HIGH_PRECISE: precise occlusion queries
+    SafeLists,       ///< EDEN_NX2_HIGH_SAFELISTS: safe command-list reads (DMA accuracy Default)
+};
+/// High GPU accuracy, or the part's EDEN_NX2_HIGH_* switch.
+bool IsGPULevelHighFor(GpuHighPart part);
+
 bool IsDMALevelDefault();
 bool IsDMALevelSafe();
 

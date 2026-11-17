@@ -287,7 +287,9 @@ void QueryCacheBase<Traits>::CounterReport(GPUVAddr addr, QueryType counter_type
     u8* pointer_timestamp = impl->device_memory.template GetPointer<u8>(cpu_addr + 8);
     const u64 report_size = has_timestamp ? 16 : 4;
     const bool immediate =
-        !is_fence && !Settings::IsGPULevelHigh() && counter_type == QueryType::Payload;
+        !is_fence &&
+        !Settings::IsGPULevelHighFor(Settings::GpuHighPart::Reports) &&
+        counter_type == QueryType::Payload;
     // Written later: the buffer cache keeps GPU writes over it until then (NoteReportPending).
     const bool report_noted =
         !immediate && impl->rasterizer.NoteReportPending(cpu_addr, report_size);
